@@ -37,3 +37,7 @@ cld
 
 The script reads commands from this file and initializes each with the given prompt to work on the specified feature.
 
+## Instructions
+
+Only ever run it in dry-run mode, *we* don't want to lose $20 in credits on a
+debugging session
