@@ -115,7 +115,9 @@ send() {
 
 	panes=$(tmux list-p -t "$session_name" -F '#D')
 	for pane in $panes; do
-		tmux send-keys -t "$pane" "$prompt" Enter
+		tmux send-keys -t "$pane" "$prompt"
+		sleep 0.1
+		tmux send-keys -t "$pane" Enter
 	done
 }
 
