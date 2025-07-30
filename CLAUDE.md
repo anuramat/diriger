@@ -25,20 +25,15 @@ Diriger automates the setup of a multi-agent development environment where diffe
    - Sends the provided prompt to start work
 6. Attaches to tmux session for monitoring
 
-## Usage
-
-```bash
-./diriger.sh <feature-name> <prompt>
-```
-
 ## Configuration
 
 Create `$XDG_CONFIG_HOME/diriger` (or `~/.config/diriger`) with one command per line:
 
 ```
 gmn
-ocd  
+ocd
 cld
 ```
 
 The script reads commands from this file and initializes each with the given prompt to work on the specified feature.
+
