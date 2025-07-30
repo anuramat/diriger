@@ -13,7 +13,8 @@ projname=$(basename "$root")
 
 tmux new -s "$diriger_id" -c "$root" -d
 
-commands=("gmn" "ocd" "cld") # TODO read from args 3-n if there are any
+commands=("${@:3}")
+[[ ${#commands[@]} -eq 0 ]] && commands=("gmn" "ocd" "cld")
 for cmd in "${commands[@]}"; do
 	echo "Launching $cmd"
 
