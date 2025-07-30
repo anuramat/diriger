@@ -2,24 +2,27 @@
 
 set -e
 
+# unique id; used to control the session afterwards
 diriger_id="diriger-$(uuidgen)"
-
 echo "Session: $diriger_id"
 
-feature="${1:?enter the feature name}"
-prompt="${2:?enter the prompt}"
-root=$PWD
-projname=$(basename "$root")
-
-tmux new -s "$diriger_id" -c "$root" -d
-
+# TODO These should be specified with one char flags:
+feature="${1:-$(gum input --header='Feature:')}" # -f featurename
+prompt="${2:-$(gum write --header='Prompt:')}"   # -p 'Prompt'
+root=$PWD                                        # -r ./long/path
+# commands should be specified like this: ./diriger.sh -a cmd1 -a 'cmd2 args2'
 config_file="${XDG_CONFIG_HOME:-$HOME/.config}/diriger"
 [[ ! -f $config_file ]] && {
 	echo "Config file $config_file not found"
 	exit 1
 }
 mapfile -t commands < "$config_file"
+
+# launch a new session
+tmux new -s "$diriger_id" -c "$root" -d
+
 i=0
+projname=$(basename "$root")
 for cmd in "${commands[@]}"; do
 	((++i))
 	agent=$(cut -d ' ' -f 1 <<< "$cmd")
