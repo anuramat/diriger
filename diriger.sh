@@ -2,24 +2,71 @@
 
 set -e
 
-# unique id; used to control the session afterwards
-diriger_id="diriger-$(uuidgen)"
-echo "Session: $diriger_id"
-
-# TODO These should be specified with one char flags:
-feature="${1:-$(gum input --header='Feature:')}" # -f featurename
-prompt="${2:-$(gum write --header='Prompt:')}"   # -p 'Prompt'
-root=$PWD                                        # -r ./long/path
-# commands should be specified like this: ./diriger.sh -a cmd1 -a 'cmd2 args2'
-config_file="${XDG_CONFIG_HOME:-$HOME/.config}/diriger"
-[[ ! -f $config_file ]] && {
-	echo "Config file $config_file not found"
-	exit 1
+# execute command, showing it in dry run mode
+run() {
+	if $dry_run; then
+		printf '$ '
+		# XXX eats the quotes, might be confusing...
+		eval "printf '%s ' $*"
+		echo
+	else
+		eval "$*"
+	fi
 }
-mapfile -t commands < "$config_file"
 
-# launch a new session
-tmux new -s "$diriger_id" -c "$root" -d
+# defaults
+dry_run=false
+feature=""
+prompt=""
+root=$PWD
+commands=()
+config_file="${XDG_CONFIG_HOME:-$HOME/.config}/diriger"
+
+# parse arguments
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-n)
+			dry_run=true
+			shift
+			;;
+		-f)
+			feature="$2"
+			shift 2
+			;;
+		-p)
+			prompt="$2"
+			shift 2
+			;;
+		-r)
+			root="$2"
+			shift 2
+			;;
+		-a)
+			commands+=("$2")
+			shift 2
+			;;
+		*)
+			echo "Unknown option: $1"
+			exit 1
+			;;
+	esac
+done
+
+# fallback to interactive input or config file
+[[ -z $feature ]] && feature="$(gum input --header='Feature:')"
+[[ -z $prompt ]] && prompt="$(gum write --header='Prompt:')"
+if [[ ${#commands[@]} -eq 0 ]]; then
+	[[ ! -f $config_file ]] && {
+		echo "Config file $config_file not found"
+		exit 1
+	}
+	mapfile -t commands < "$config_file"
+fi
+
+# launch the tmux session
+diriger_id="diriger-$(uuidgen)" # unique id; used to control the session afterwards
+echo "Session: $diriger_id"
+run 'tmux new -s "$diriger_id" -c "$root" -d'
 
 i=0
 projname=$(basename "$root")
@@ -30,12 +77,12 @@ for cmd in "${commands[@]}"; do
 	echo "Launching $cmd"
 
 	treename="$projname-$feature-$agent-$i"
-	if ! git worktree add "../$treename" &> /dev/null; then
-		echo "Couldn't create a worktree $treename"
-		exit 1
-	fi
-	treepath="$(realpath -e "../$treename")"
+	run 'git worktree add "../$treename"'
+	# shellcheck disable=SC2034
+	# used in `eval` inside `run`
+	treepath="$(realpath "../$treename")"
 
+	# append the prompt
 	case "$agent" in
 		gmn) cmd+=" -i '$prompt'" ;;
 		ocd) cmd+=" -p '$prompt'" ;;
@@ -46,8 +93,9 @@ for cmd in "${commands[@]}"; do
 			;;
 	esac
 
-	tmux neww -t "$diriger_id" -n "$agent-$i" -c "$treepath" "$cmd"
+	# start the agent
+	run 'tmux neww -t "$diriger_id" -n "$agent-$i" -c "$treepath" "$cmd"'
 done
 echo "${#commands[@]} agents started"
-tmux killp -t "$diriger_id:0"
-tmux a -t "$diriger_id"
+run 'tmux killp -t "$diriger_id:0"'
+run 'tmux a -t "$diriger_id"'
