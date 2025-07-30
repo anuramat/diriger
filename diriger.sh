@@ -2,6 +2,8 @@
 
 set -e
 
+session_prefix='diriger-'
+
 # execute command, showing it in dry run mode
 run() {
 	if $dry_run; then
@@ -65,9 +67,10 @@ launch() {
 	fi
 
 	# launch the tmux session
-	diriger_id="diriger-$(uuidgen)" # unique id; used to control the session afterwards
-	echo "Session: $diriger_id"
-	run 'tmux new -s "$diriger_id" -c "$root" -d'
+	session_name="$session_prefix$(uuidgen)" # unique id; used to control the session afterwards
+	# TODO add project and feature to the session name
+	echo "Session: $session_name"
+	run 'tmux new -s "$session_name" -c "$root" -d'
 
 	i=0
 	projname=$(basename "$root")
@@ -95,28 +98,25 @@ launch() {
 		esac
 
 		# start the agent
-		run 'tmux neww -t "$diriger_id" -n "$agent-$i" -c "$treepath" "$cmd"'
+		run 'tmux neww -t "$session_name" -n "$agent-$i" -c "$treepath" "$cmd"'
 	done
 	echo "${#commands[@]} agents started"
-	run 'tmux killp -t "$diriger_id:0"'
-	run 'tmux a -t "$diriger_id"'
+	run 'tmux killp -t "$session_name:0"'
+	run 'tmux a -t "$session_name"'
 }
 
 send() {
-	session_id="$1"
-	prompt="$2"
+	# TODO use the same flags as the `launch` subcommand
+	sessions=$(tmux ls -F '#S' | grep -F "$session_prefix")
+	(($(wc -l <<< "$sessions") > 0))
+	session_name=$(gum choose --header='Session:' <<< "$sessions")
+	# TODO strip away session_prefix, append when needed
+	prompt="$(gum write --header='Prompt:')"
 
-	[[ -z $session_id ]] && {
-		echo "Usage: diriger send <session_id> <prompt>"
-		exit 1
-	}
-	[[ -z $prompt ]] && prompt="$(gum write --header='Prompt:')"
-
-	panes=$(tmux list-p -t "$session_id" -F '#{pane_id}')
+	panes=$(tmux list-p -t "$session_name" -F '#D')
 	for pane in $panes; do
-		tmux send -t "$pane" "$prompt" Enter
+		tmux send-keys -t "$pane" "$prompt" Enter
 	done
-	echo "Sent prompt to all panes in session $session_id"
 }
 
 case "${1:-}" in
