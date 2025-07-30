@@ -15,17 +15,19 @@ tmux new -s "$diriger_id" -c "$root" -d
 
 commands=("${@:3}")
 [[ ${#commands[@]} -eq 0 ]] && commands=("gmn" "ocd" "cld")
+i=0
 for cmd in "${commands[@]}"; do
+	((++i))
+	agent=$(cut -d ' ' -f 1 <<< "$cmd")
+
 	echo "Launching $cmd"
 
-	treename="$projname-$feature-$cmd"
+	treename="$projname-$feature-$agent-$i"
 	if ! git worktree add "../$treename" &> /dev/null; then
 		echo "Couldn't create a worktree $treename"
 		exit 1
 	fi
 	treepath="$(realpath -e "../$treename")"
-
-	agent=$(cut -d ' ' -f 1 <<< "$cmd")
 
 	case "$agent" in
 		gmn) cmd+=" -i '$prompt'" ;;
@@ -37,7 +39,7 @@ for cmd in "${commands[@]}"; do
 			;;
 	esac
 
-	tmux neww -t "$diriger_id" -n "$cmd" -c "$treepath" "$cmd"
+	tmux neww -t "$diriger_id" -n "$agent-$i" -c "$treepath" "$cmd"
 done
 echo "${#commands[@]} agents started"
 tmux killp -t "$diriger_id:0"
