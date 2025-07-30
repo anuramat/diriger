@@ -13,8 +13,12 @@ projname=$(basename "$root")
 
 tmux new -s "$diriger_id" -c "$root" -d
 
-commands=("${@:3}")
-[[ ${#commands[@]} -eq 0 ]] && commands=("gmn" "ocd" "cld")
+config_file="${XDG_CONFIG_HOME:-$HOME/.config}/diriger"
+[[ ! -f $config_file ]] && {
+	echo "Config file $config_file not found"
+	exit 1
+}
+mapfile -t commands < "$config_file"
 i=0
 for cmd in "${commands[@]}"; do
 	((++i))
