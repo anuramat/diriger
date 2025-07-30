@@ -1,0 +1,10 @@
+walk = "git"
+
+[formatter.nix]
+command = "nixfmt"
+includes = [ "*.nix" ]
+
+[formatter.shell]
+includes = [ "*.sh" ]
+command = "shfmt"
+options = [ "--write", "--simplify", "--case-indent", "--binary-next-line", "--space-redirects" ]
