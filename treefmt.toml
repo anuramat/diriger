@@ -7,4 +7,9 @@ includes = [ "*.nix" ]
 [formatter.shell]
 includes = [ "*.sh" ]
 command = "shfmt"
-options = [ "--write", "--simplify", "--case-indent", "--binary-next-line", "--space-redirects" ]
+options = [ "--write", "--simplify", "--case-indent", "--binary-next-line" ]
+
+[formatter.shellharden]
+includes = [ "*.sh" ]
+command = "shellharden"
+options = [ "--replace" ]

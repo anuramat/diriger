@@ -3,6 +3,7 @@
 set -e
 
 SESSION_PREFIX='diriger'
+INIT_SLEEP='5'
 
 # defaults
 dry_run=false
@@ -11,9 +12,10 @@ prompt=""
 root=$PWD
 commands=()
 config_file="${XDG_CONFIG_HOME:-$HOME/.config}/diriger"
+worktree_root="${XDG_DATA_HOME:-$HOME/.local/share}/diriger"
+mkdir -p "$worktree_root"
 
 argparse() {
-	# parse arguments
 	while [[ $# -gt 0 ]]; do
 		case $1 in
 			-n)
@@ -43,19 +45,18 @@ argparse() {
 		esac
 	done
 
-	# fallback to interactive input or config file
 	if [[ ${#commands[@]} -eq 0 ]]; then
 		[[ ! -f $config_file ]] && {
 			echo "Config file $config_file not found"
 			exit 1
 		}
-		mapfile -t commands < "$config_file"
+		mapfile -t commands <"$config_file"
 	fi
 }
 
-# execute command, showing it in dry run mode
+# dry run wrapper
 run() {
-	if $dry_run; then
+	if "$dry_run"; then
 		printf '$ '
 		# XXX eats the quotes, might be confusing...
 		eval "printf '%s ' $*"
@@ -79,31 +80,57 @@ launch() {
 	i=0
 	for cmd in "${commands[@]}"; do
 		((++i))
-		agent=$(cut -d ' ' -f 1 <<< "$cmd")
+		agent=$(cut -d ' ' -f 1 <<<"$cmd")
 
 		echo "Launching $cmd"
 
 		treename="$projname-$feature-$agent-$i"
-		run 'git worktree add "../$treename"'
 		# shellcheck disable=SC2034
 		# used in `eval` inside `run`
-		treepath="$(realpath "../$treename")"
+		treepath="$(realpath "$worktree_root/$treename")"
+		run 'git worktree add -b "$feature-$agent-$i" "$treepath"'
 
 		# append the prompt
+		unknown_agent=false
+		ready_msg=
 		if [[ -n $prompt ]]; then
 			case "$agent" in
 				gmn) cmd+=" -i '$prompt'" ;;
 				ocd) cmd+=" -p '$prompt'" ;;
 				cld) cmd+=" ' $prompt'" ;;
-				*)
-					echo "Invalid agent"
-					exit 1
-					;;
+				crs) ready_msg="Ready?" ;;
+				*) unknown_agent=true ;;
 			esac
 		fi
 
 		# start the agent
-		run 'tmux neww -t "$session_name" -n "$agent-$i" -c "$treepath" "$cmd"'
+		pane="$agent-$i"
+		# TODO we might need escaping in $cmd
+		run 'tmux neww -t "$session_name" -n "$pane" -c "$treepath" "$cmd"'
+		if [[ $ready_msg != "" ]] || [[ $unknown_agent == true ]]; then
+			if [[ $ready_msg != "" ]]; then
+				# TODO factor out the numbers everywhere
+				for i in {1..25}; do
+					capture=$(tmux capture-pane -t "$pane" -p)
+					if grep -qF "$ready_msg" <<<"$capture"; then
+						ready=true
+						break
+					fi
+					sleep 0.2
+				done
+				if [[ $ready != true ]]; then
+					echo "Agent '$agent' failed to initialize"
+					continue
+				fi
+			else
+				echo "Unknown agent '$agent', using hardcoded sleep interval: $INIT_SLEEP"
+				sleep "$INIT_SLEEP"
+			fi
+
+			run 'tmux send-keys -t "$session_name:$pane" "$prompt"'
+			sleep 0.1
+			run 'tmux send-keys -t "$session_name:$pane" Enter'
+		fi
 	done
 	echo "${#commands[@]} agents started"
 	run 'tmux killp -t "$session_name:0"'
@@ -113,10 +140,10 @@ launch() {
 send() {
 	# TODO show session details when asking for prompt; maybe in the chooser as well
 	sessions=$(tmux ls -F '#S' | grep -F "$SESSION_PREFIX")
-	if (($(wc -l <<< "$sessions") == 0)); then
+	if (($(wc -l <<<"$sessions") == 0)); then
 		exit 1
 	fi
-	session_name=$(gum choose --header='Session:' <<< "$sessions")
+	session_name=$(gum choose --header='Session:' <<<"$sessions")
 	[[ -z $prompt ]] && prompt="$(gum write --header="Prompt ($session_name):")"
 
 	panes=$(tmux list-p -st "$session_name" -F '#D')
@@ -124,7 +151,7 @@ send() {
 
 	# shellcheck disable=SC2034
 	# used in `eval` inside `run`
-	for pane in $panes; do
+	for pane in "${panes[@]}"; do
 		run 'tmux send-keys -t "$pane" "$prompt"'
 		sleep 0.1 # HACK gemini ignores enter otherwise
 		run 'tmux send-keys -t "$pane" Enter'
@@ -146,6 +173,9 @@ case "${1:-}" in
 		shift
 		argparse "$@"
 		send "$@"
+		;;
+	config)
+		"$EDITOR" "$config_file"
 		;;
 	*)
 		exit 1
