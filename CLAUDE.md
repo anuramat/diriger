@@ -15,15 +15,20 @@ Diriger automates the setup of a multi-agent development environment where diffe
 
 ## Workflow
 
-1. Creates unique session ID with `diriger-$(uuidgen)`
-2. Accepts feature name and prompt as required arguments
-3. Reads commands from config file `$XDG_CONFIG_HOME/diriger`
-4. Launches tmux session in project root
+1. Creates unique tmux session with format `diriger-<projname>-<feature>-<uuid>`
+2. Accepts optional `-f` (feature), `-p` (prompt), `-n` (dry-run), `-r` (root), `-a` (agents) args
+3. Reads commands from config file (`$XDG_CONFIG_HOME/diriger`), or from `-a` flags
+4. Launches tmux session in $root dir
 5. For each command:
-   - Creates dedicated git worktree (`../projname-feature-agent-N`)
-   - Spawns tmux window running the command
-   - Sends the provided prompt to start work
-6. Attaches to tmux session for monitoring
+   - Creates dedicated git worktree `$worktree_root/<projname>-<feature>-<agent>-<num>`
+   - Spawns tmux window in that worktree with the agent command and injected prompt, varying per agent type
+   - Special handling for agent init depending on agent name (prompt injection, ready message, sleep)
+6. (If needed) Waits for agent initialization (ready message or sleep) before sending prompt
+7. Attaches to tmux session for monitoring
+
+## Formatting
+
+Code style, linting, and formatting are managed by treefmt.toml in the project root. Adjust tools/settings there as needed.
 
 ## Configuration
 
