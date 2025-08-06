@@ -13,3 +13,8 @@ options = [ "--write", "--simplify", "--case-indent", "--binary-next-line" ]
 includes = [ "*.sh" ]
 command = "shellharden"
 options = [ "--replace" ]
+
+[formatter.python]
+includes = [ "*.py" ]
+command = "black"
+options = [ "--line-length", "120" ]
